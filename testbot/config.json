@@ -1,0 +1,17 @@
+{
+    "tests": [
+        {
+            "project": "InfiniCore",
+            "env_name": "Windows本机",
+            "repo_url": "git@github.com:PanZezhong1725/InfiniCore.git",
+            "xmake_config_flags": "--nv-gpu=true",
+            "branches": [
+                "main"
+            ],
+            "notifier": {
+                "type": "Feishu",
+                "url": "https://open.feishu.cn/open-apis/bot/v2/hook/****"
+            }
+        }
+    ]
+}

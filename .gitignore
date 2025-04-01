@@ -1,0 +1,16 @@
+InfiniCore/
+
+#GGUF
+*.gguf
+
+# Vscode
+.vscode/
+
+# Python
+__pycache__/
+
+# Log
+*.log
+
+# Cache
+cache/
