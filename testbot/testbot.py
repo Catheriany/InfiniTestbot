@@ -196,7 +196,7 @@ class InfiniCoreTestBot(TestBot):
             if platform.system() == "Windows":
                 self.test_cmd(f".\\scripts\\install.bat . {config_flags}", name=name)
             elif platform.system() == "Linux":
-                self.test_cmd(f"./scripts/install.sh . {config_flags}", name=name)
+                self.test_cmd(f"bash ./scripts/install.sh . {config_flags}", name=name)
             else:
                 raise RuntimeError("Unsupported platform.")
         except:
