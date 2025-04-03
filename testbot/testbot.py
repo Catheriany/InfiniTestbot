@@ -167,7 +167,7 @@ class InfiniCoreTestBot(TestBot):
         super().__init__(config)
         self.xmake_config_flags = config.get("xmake_config_flags", "")
 
-        if os.environ.get("INFINI_ROOT", "") == "":
+        if os.environ.get("INFINI_ROOT") == None:
             os.environ["INFINI_ROOT"] = os.path.expanduser("~/.infini")
         # Detect OS
         if platform.system() == "Windows":
@@ -193,12 +193,8 @@ class InfiniCoreTestBot(TestBot):
         name = "安装InfiniCore"
         try:
             os.chdir(self.project_dir)
-            if platform.system() == "Windows":
-                self.test_cmd(f".\\scripts\\install.bat . {config_flags}", name=name)
-            elif platform.system() == "Linux":
-                self.test_cmd(f"bash ./scripts/install.sh . {config_flags}", name=name)
-            else:
-                raise RuntimeError("Unsupported platform.")
+            self.test_cmd(f"python scripts/install.py {config_flags}", name=name)
+
         except:
             raise RuntimeError(f"Failed to build and deploy InfiniCore.")
 
