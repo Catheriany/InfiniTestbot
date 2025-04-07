@@ -4,7 +4,7 @@
             "project": "InfiniCore",
             "env_name": "Windows本机",
             "repo_url": "git@github.com:PanZezhong1725/InfiniCore.git",
-            "xmake_config_flags": "--nv-gpu=true",
+            "device_type": "nvidia",
             "branches": [
                 "main"
             ],

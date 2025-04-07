@@ -7,6 +7,7 @@ from io import BytesIO
 import platform
 import abc
 import json
+import schedule
 
 
 CONFIG_JSON = "config.json"
@@ -38,7 +39,7 @@ class FeishuNotifier(Notifier):
             if result.returncode != 0:
                 message = [f"{result.name} 失败 代号{result.returncode}\n"]
                 message.append(f"输出: {result.stdout}\n")
-                messages.append({"tag": "text", "text": message})
+                messages.append([{"tag": "text", "text": m} for m in message])
                 is_success = "自动测试失败"
             else:
                 message = f"{result.name}  成功.\n"
@@ -163,9 +164,22 @@ class TestBot:
 
 
 class InfiniCoreTestBot(TestBot):
+    DEVICE_FLAGS = {
+        "cpu": ("", ""),
+        "nvidia": ("--nv-gpu=true", "--nvidia"),
+        "cambricon": ("--cambricon-mlu=true", "--cambricon"),
+        "ascend": ("--ascend-npu=true", "--ascend"),
+    }
+
+    def get_xmake_config_flags(self):
+        return InfiniCoreTestBot.DEVICE_FLAGS[self.device_type][0]
+
+    def get_python_test_flags(self):
+        return InfiniCoreTestBot.DEVICE_FLAGS[self.device_type][1]
+
     def __init__(self, config):
         super().__init__(config)
-        self.xmake_config_flags = config.get("xmake_config_flags", "")
+        self.device_type = config.get("device_type", "cpu")
 
         if os.environ.get("INFINI_ROOT") == None:
             os.environ["INFINI_ROOT"] = os.path.expanduser("~/.infini")
@@ -196,15 +210,27 @@ class InfiniCoreTestBot(TestBot):
             self.test_cmd(f"python scripts/install.py {config_flags}", name=name)
 
         except:
-            raise RuntimeError(f"Failed to build and deploy InfiniCore.")
+            raise
+
+    def run_python_tests(self, flags=""):
+        name = "运行算子python测试"
+        try:
+            os.chdir(self.project_dir)
+            self.test_cmd(
+                f"python scripts/python_test.py {flags}",
+                name=name,
+                break_on_error=False,
+            )
+
+        except:
+            raise
 
     def run_tests(self):
+        def _run_test():
+            self.install(self.get_xmake_config_flags())
+            self.run_python_tests(self.get_python_test_flags())
+
         try:
-
-            def _run_test():
-                self.install(self.xmake_config_flags)
-                self.notify_results()
-
             self.clone_or_update()
             if self.branches is None or len(self.branches) == 0:
                 _run_test()
@@ -213,7 +239,10 @@ class InfiniCoreTestBot(TestBot):
                     self.checkout_branch(branch)
                     _run_test()
         except:
-            raise RuntimeError(f"Failed to run tests.")
+            self.notify_results()
+            raise
+
+        self.notify_results()
 
 
 def build_testbots_from_json(json_file_path):
@@ -226,10 +255,21 @@ def build_testbots_from_json(json_file_path):
     return bots
 
 
-if __name__ == "__main__":
-    bots = build_testbots_from_json(
-        os.path.join(os.path.dirname(os.path.abspath(__file__)), CONFIG_JSON)
-    )
+def main():
+    try:
+        bots = build_testbots_from_json(
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), CONFIG_JSON)
+        )
 
-    for bot in bots:
-        bot.run_tests()
+        for bot in bots:
+            bot.run_tests()
+    except:
+        time.sleep(60)
+
+
+schedule.every().day.at("00:00").do(lambda: main())
+
+if __name__ == "__main__":
+    while True:
+        schedule.run_pending()
+        time.sleep(1)
