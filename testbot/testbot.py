@@ -8,6 +8,7 @@ import platform
 import abc
 import json
 import schedule
+from datetime import datetime
 
 
 CONFIG_JSON = "config.json"
@@ -213,22 +214,120 @@ class InfiniCoreTestBot(TestBot):
             raise
 
     def run_python_tests(self, flags=""):
-        name = "运行算子python测试"
-        try:
-            os.chdir(self.project_dir)
-            self.test_cmd(
-                f"python scripts/python_test.py {flags}",
-                name=name,
-                break_on_error=False,
-            )
+        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        log_file = os.path.join(self.project_dir, f"python_test_{timestamp}.log")
 
-        except:
+        try:
+            cmd = f"python scripts/python_test.py {flags}".strip()
+            with open(log_file, "w", encoding="utf-8", errors="replace") as log:
+                result = subprocess.run(
+                    cmd,
+                    shell=True,
+                    cwd=self.project_dir,
+                    stdout=log,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                )
+                if result.returncode != 0:
+                    log.write(f"\n[ERROR] Python tests failed with return code {result.returncode}\n")
+                    raise subprocess.CalledProcessError(result.returncode, cmd)
+        except Exception as e:
             raise
+
+
+    def run_gguf_tests(self, flags=""):
+        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        log_file = os.path.join(self.project_dir, f"gguf_test_{timestamp}.log")
+
+        try:
+            cmd = f"python scripts/gguf_test.py {flags}".strip()
+            with open(log_file, "w", encoding="utf-8", errors="replace") as log:
+                result = subprocess.run(
+                    cmd,
+                    shell=True,
+                    cwd=self.project_dir,
+                    stdout=log,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace"
+                )
+                if result.returncode != 0:
+                    log.write(f"\n[ERROR] GGUF test failed with return code {result.returncode}\n")
+                    raise subprocess.CalledProcessError(result.returncode, cmd)
+
+        except Exception as e:
+            raise
+
+
+    def run_infiniccl_test(self, flags=""):
+        os.chdir(self.project_dir)
+        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        log_file = os.path.join(self.project_dir, f"infiniccl_test_{timestamp}.log")
+        
+        with open(log_file, "w", encoding="utf-8", errors="replace") as log:
+
+            def run_and_log(cmd, header):
+                log.write(f"\n=== {header} ===\n")
+                result = subprocess.run(
+                    cmd,
+                    shell=True,
+                    cwd=self.project_dir,
+                    stdout=log,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                )
+                if result.returncode != 0:
+                    log.write(f"\n[ERROR] '{cmd}' exited with code {result.returncode}\n")
+                    raise subprocess.CalledProcessError(result.returncode, cmd)
+
+            run_and_log("xmake build infiniccl-test", "Building infiniccl-test")
+            run_and_log("xmake install", "Installing infiniccl-test")
+            exe_cmd = f"build/linux/x86_64/release/infiniccl-test {flags}"
+            run_and_log(exe_cmd, "Running infiniccl-test")
+
+
+    def run_infinirt_test(self, flags=""):
+        os.chdir(self.project_dir)
+        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        log_file = os.path.join(self.project_dir, f"infinirt_test_{timestamp}.log")
+
+        with open(log_file, "w", encoding="utf-8", errors="replace") as log:
+
+            def run_and_log(cmd, header):
+                log.write(f"\n=== {header} ===\n")
+                result = subprocess.run(
+                    cmd,
+                    shell=True,
+                    stdout=log,
+                    stderr=subprocess.STDOUT,
+                    cwd=self.project_dir,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                )
+                if result.returncode != 0:
+                    log.write(f"\n[ERROR] Command failed with exit code {result.returncode}\n")
+                    raise subprocess.CalledProcessError(result.returncode, cmd)
+
+            run_and_log("xmake build infinirt-test", "Building infinirt-test")
+            run_and_log("xmake install", "Installing infinirt-test")
+
+            exe_cmd = f"build/linux/x86_64/release/infinirt-test {flags}"
+            run_and_log(exe_cmd, "Running infinirt-test")
+
 
     def run_tests(self):
         def _run_test():
             self.install(self.get_xmake_config_flags())
             self.run_python_tests(self.get_python_test_flags())
+            self.run_gguf_tests(self.get_python_test_flags())
+            self.run_infiniccl_test(self.get_python_test_flags())
+            self.run_infinirt_test(self.get_python_test_flags())
 
         try:
             self.clone_or_update()
