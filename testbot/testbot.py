@@ -6,10 +6,9 @@ import json
 from io import BytesIO
 import platform
 import abc
-import json
 import schedule
 from datetime import datetime
-
+import sys
 
 CONFIG_JSON = "config.json"
 
@@ -26,7 +25,6 @@ class CmdResult:
 class Notifier(abc.ABC):
     def notify_results(self, meta):
         raise NotImplementedError()
-
 
 class FeishuNotifier(Notifier):
     def __init__(self, config):
@@ -206,60 +204,95 @@ class InfiniCoreTestBot(TestBot):
 
     def install(self, config_flags=""):
         name = "安装InfiniCore"
-        try:
-            os.chdir(self.project_dir)
-            self.test_cmd(f"python scripts/install.py {config_flags}", name=name)
+        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        log_file = os.path.join(self.project_dir, f"install_{timestamp}.log")
+        cmd = f"python scripts/install.py {config_flags}".strip()
 
-        except:
-            raise
+        with open(log_file, "w", encoding="utf-8", errors="replace") as log:
+            proc = subprocess.Popen(
+                cmd,
+                shell=True,
+                cwd=self.project_dir,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                bufsize=1,
+            )
+            for line in proc.stdout:
+                log.write(line)
+                sys.stdout.write(line)
+                sys.stdout.flush()
+
+            returncode = proc.wait()
+            if returncode != 0:
+                err = f"\n[ERROR] {name} failed with return code {returncode}\n"
+                log.write(err)
+                sys.stdout.write(err)
+                raise subprocess.CalledProcessError(returncode, cmd)
 
     def run_python_tests(self, flags=""):
         timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
         log_file = os.path.join(self.project_dir, f"python_test_{timestamp}.log")
 
-        try:
-            cmd = f"python scripts/python_test.py {flags}".strip()
-            with open(log_file, "w", encoding="utf-8", errors="replace") as log:
-                result = subprocess.run(
-                    cmd,
-                    shell=True,
-                    cwd=self.project_dir,
-                    stdout=log,
-                    stderr=subprocess.STDOUT,
-                    text=True,
-                    encoding="utf-8",
-                    errors="replace",
-                )
-                if result.returncode != 0:
-                    log.write(f"\n[ERROR] Python tests failed with return code {result.returncode}\n")
-                    raise subprocess.CalledProcessError(result.returncode, cmd)
-        except Exception as e:
-            raise
+        cmd = f"python scripts/python_test.py {flags}".strip()
+        with open(log_file, "w", encoding="utf-8", errors="replace") as log:
+            process = subprocess.Popen(
+                cmd,
+                shell=True,
+                cwd=self.project_dir,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+            )
+
+            for line in process.stdout:
+                log.write(line)
+                sys.stdout.write(line)
+                sys.stdout.flush()
+
+            returncode = process.wait()
+
+            if returncode != 0:
+                err_msg = f"\n[ERROR] Python tests failed with return code {returncode}\n"
+                log.write(err_msg)
+                sys.stdout.write(err_msg)
+                raise subprocess.CalledProcessError(returncode, cmd)
 
 
     def run_gguf_tests(self, flags=""):
         timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
         log_file = os.path.join(self.project_dir, f"gguf_test_{timestamp}.log")
 
-        try:
-            cmd = f"python scripts/gguf_test.py {flags}".strip()
-            with open(log_file, "w", encoding="utf-8", errors="replace") as log:
-                result = subprocess.run(
-                    cmd,
-                    shell=True,
-                    cwd=self.project_dir,
-                    stdout=log,
-                    stderr=subprocess.STDOUT,
-                    text=True,
-                    encoding="utf-8",
-                    errors="replace"
-                )
-                if result.returncode != 0:
-                    log.write(f"\n[ERROR] GGUF test failed with return code {result.returncode}\n")
-                    raise subprocess.CalledProcessError(result.returncode, cmd)
+        cmd = f"python scripts/gguf_test.py {flags}".strip()
+        with open(log_file, "w", encoding="utf-8", errors="replace") as log:
+            proc = subprocess.Popen(
+                cmd,
+                shell=True,
+                cwd=self.project_dir,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                bufsize=1,
+            )
 
-        except Exception as e:
-            raise
+            # 实时输出并写日志
+            for line in proc.stdout:
+                log.write(line)
+                sys.stdout.write(line)
+                sys.stdout.flush()
+
+            returncode = proc.wait()
+            if returncode != 0:
+                err_msg = f"\n[ERROR] GGUF test failed with return code {returncode}\n"
+                log.write(err_msg)
+                sys.stdout.write(err_msg)
+                raise subprocess.CalledProcessError(returncode, cmd)
 
 
     def run_infiniccl_test(self, flags=""):
